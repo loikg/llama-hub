@@ -6,7 +6,7 @@ from llama_index.llama_pack.base import BaseLlamaPack
 from llama_index.evaluation.base import EvaluationResult
 import tqdm
 from llama_index.llms import OpenAI, LLM
-from llama_index import ServiceContext
+from llama_index import OpenAIEmbedding, ServiceContext
 from llama_index.evaluation import (
     CorrectnessEvaluator,
     FaithfulnessEvaluator,
@@ -14,6 +14,7 @@ from llama_index.evaluation import (
     SemanticSimilarityEvaluator,
     EvaluationResult,
 )
+from llama_index.embeddings.utils import EmbedType
 import json
 import pandas as pd
 from llama_index.evaluation.notebook_utils import (
@@ -41,6 +42,7 @@ class RagEvaluatorPack(BaseLlamaPack):
         query_engine: BaseQueryEngine,
         rag_dataset: BaseLlamaDataset,
         judge_llm: Optional[LLM] = None,
+        embed_model: Optional[EmbedType] = None,
         show_progress: bool = True,
     ):
         self.query_engine = query_engine
@@ -51,6 +53,13 @@ class RagEvaluatorPack(BaseLlamaPack):
         else:
             assert isinstance(judge_llm, LLM)
             self.judge_llm = judge_llm
+
+        if embed_model is None:
+            self.embed_model = OpenAIEmbedding()
+        else:
+            assert isinstance(embed_model, EmbedType)
+            self.embed_model = embed_model
+
         self.show_progress = show_progress
         self.evals = {
             "correctness": [],
@@ -97,20 +106,26 @@ class RagEvaluatorPack(BaseLlamaPack):
         judges["correctness"] = CorrectnessEvaluator(
             service_context=ServiceContext.from_defaults(
                 llm=self.judge_llm,
+                embed_model=self.embed_model,
             )
         )
         judges["relevancy"] = RelevancyEvaluator(
             service_context=ServiceContext.from_defaults(
                 llm=self.judge_llm,
+                embed_model=self.embed_model,
             )
         )
         judges["faithfulness"] = FaithfulnessEvaluator(
             service_context=ServiceContext.from_defaults(
                 llm=self.judge_llm,
+                embed_model=self.embed_model,
             )
         )
         judges["semantic_similarity"] = SemanticSimilarityEvaluator(
-            service_context=ServiceContext.from_defaults()
+            service_context=ServiceContext.from_defaults(
+                llm=self.judge_llm,
+                embed_model=self.embed_model,
+            )
         )
         return judges
 
